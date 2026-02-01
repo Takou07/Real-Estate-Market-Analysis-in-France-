@@ -1,0 +1,7 @@
+# Ignorer les données
+Data_lake/
+warehouse/
+
+# Ignorer les dossiers Python inutiles
+#__pycache__/
+#.venv/
