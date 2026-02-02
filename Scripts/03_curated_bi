@@ -1,0 +1,44 @@
+import pandas as pd
+import os
+
+# Configuration des dossiers
+STAGING_PATH = './Data_lake/staging/'
+CURATED_PATH = './Data_lake/curated/'
+os.makedirs(CURATED_PATH, exist_ok=True)
+
+# 1. Chargement des données Staging
+df_mensuel = pd.read_csv(os.path.join(STAGING_PATH, 'stg_dvf_mensuel_staging.csv'))
+df_geo = pd.read_csv(os.path.join(STAGING_PATH, 'stg_dvf_geo_staging.csv'))
+
+# --- DATASET 1 : Indicateurs Mensuels France ---
+# On veut une seule ligne par mois qui résume toute la France
+bi_france_monthly = df_mensuel.groupby('annee_mois').agg({
+    'nb_ventes_maison': 'sum',
+    'nb_ventes_appartement': 'sum',
+    'med_prix_m2_maison': 'median',       # Médiane des médianes (approximation BI)
+    'med_prix_m2_appartement': 'median'
+}).reset_index()
+
+# Ajout d'une colonne métier : Volume Total
+bi_france_monthly['total_transactions'] = (
+    bi_france_monthly['nb_ventes_maison'] + bi_france_monthly['nb_ventes_appartement']
+)
+
+# --- DATASET 2 : Top Départements ---
+# On se base sur le fichier géographique (global) pour avoir les meilleurs
+# a. Top 10 par volume de transactions
+top_volume = df_geo.nlargest(10, 'nb_ventes_whole_apt_maison')[
+    ['code_geo', 'libelle_geo', 'nb_ventes_whole_apt_maison']
+]
+
+# b. Top 10 par prix médian (Appartements)
+top_prix = df_geo.nlargest(10, 'med_prix_m2_whole_appartement')[
+    ['code_geo', 'libelle_geo', 'med_prix_m2_whole_appartement']
+]
+
+# --- SAUVEGARDE ---
+bi_france_monthly.to_csv(os.path.join(CURATED_PATH, 'france_mensuel.csv'), index=False)
+top_volume.to_csv(os.path.join(CURATED_PATH, 'top_dep_volume.csv'), index=False)
+top_prix.to_csv(os.path.join(CURATED_PATH, 'top_dep_prix.csv'), index=False)
+
+print("Phase Curated terminée ! Les fichiers BI sont prêts dans data_lake/curated/")
